@@ -1,0 +1,369 @@
+---
+#############################################################
+#                                                           #
+# Click on "Run Document" in RStudio to run this worksheet. #
+#                                                           #
+#############################################################
+title: "Data Wrangling: Pivoting and Joins"
+author: "Sarah Evans"
+output: learnr::tutorial
+runtime: shiny_prerendered
+---
+
+```{r setup, include=FALSE}
+library(learnr)
+library(tidyverse)
+library(maps)
+library(datasets)
+knitr::opts_chunk$set(echo = FALSE, comment = "")
+
+penguins <- palmerpenguins::penguins
+
+# Preparing datasets for pivoting
+penguins_long <- palmerpenguins::penguins |>
+  filter(!is.na(sex)) |>
+  group_by(species, island) |>
+  summarize(mean_weight = mean(body_mass_g, na.rm = TRUE))
+
+penguins_wide <- penguins_long |>
+  pivot_wider(names_from = "island", values_from = "mean_weight")
+
+# Sample dataset mimicking multiple columns with the same prefix
+penguin_weights <- palmerpenguins::penguins |>
+  filter(!is.na(sex)) |>
+  group_by(species, island, sex, year) |>
+  summarize(weight = mean(body_mass_g, na.rm = TRUE)) |>  # Summarize weights
+  pivot_wider(names_from = year, values_from = weight, names_prefix = "weight_") |>
+  select(species, island, sex, starts_with("weight"))
+
+# Preparing datasets for joins
+states_info <- tibble(
+  state = state.name,
+  area = state.area,
+  region = state.region
+)
+
+state_crime <- USArrests |>
+  rownames_to_column(var = "state")
+
+# Convert state names to lowercase for consistency in joins
+states_info <- states_info |>
+  mutate(state = tolower(state))
+
+state_crime <- state_crime |>
+  mutate(state = tolower(state))
+```
+
+## **Introduction**
+
+This interactive worksheet explores **data reshaping (pivoting)** and **combining datasets using joins** using the **tidyverse**.
+
+On the following pages are exercises designed to help you manipulate some test data while learning about data wrangling through pivots and joins. Each exercise allows you to try out different approaches and view the results. If you get stuck, there are hints available via a button at the top of each exercise code block. To reset the worksheet, click "Start Over" in the left-hand panel to erase and reset your progress.
+
+Focus of this exercise:
+
+-   **pivot_longer()** and **pivot_wider()** for transforming datasets between wide and long formats
+
+    -   Additionally, you can explore a long-form document with step-by-step guidance on pivot functions in R-Studio by typing `vignette("pivot")` into the R-console pane.
+
+-   **left_join()**, **right_join(**), and **inner_join()** for merging datasets
+
+    -   Join functions allow you to join two data frames based on the common columns of single/multiple and return the data frame having all rows from the left data frame, right data frame, only rows that are in both data frames or all rows regardless if there is a match on the common column depending on the function chosen. Any unmatched rows will have NA values in the columns corresponding to any non-matched rows in the corresponding dataframe.
+
+Next, you will explore join functions using data from the built-in dataset **USArrests** and a data frame generated from the built-in **state** dataset to will walk through how to combine data frames by matching state names to create a data frame with land area and region labels combined with state crime statistics. Joining data frames allows you to explore data trends and create models using data from multiple sources. You can review additional documentation for the source and the variables within these datasets by typing `?datasets::state` and `?datasets::USArrests` into your R-console pane.
+
+```{r library-calls, echo = FALSE, eval = FALSE}
+library(tidyverse)
+library(maps)
+library(datasets)
+```
+
+## Exploring the Pivot Functions
+
+This exercise will execute pivot functions on the penguins dataset to explore different ways of viewing weight data on penguins of various species and from different locations.
+You can review additional documentation for the source and the variables in the penguins dataset by typing `?palmerpenguins::penguins` into your R-console pane. First, review the structure and format of the dataset and then explore the structure of the tables created for this exercise:
+
+```{r dataset-loading, echo = TRUE}
+
+penguins_long
+penguins_wide
+
+```
+
+### Converting Long Data to Wide
+
+In the course lectures, analyzing data in a "long format" was discussed as a preferred format for data analysis. A long-format means that each row represents a unique observation. In the penguins_long dataset, each row represents the mean weight of penguins of a specific species on a specific island. In contrast, the penguins_wide dataset has a column for each island, aggregating the mean weight of each penguin species from each respective island. Wide data is often easier to read, and may be appropriate for generating more compact human-readable tables. Transforming datasets into a long data format, however, is often needed to perform data analysis and visualization tasks.
+
+The penguins_long data has the columns `species`, `island` and `mean_weight`. The penguins_wide data, however, has the `species` column but then has separate columns for each island, `Dream`, `Torgersen`, and `Biscoe`  each containing values for relevant mean weights associated with each species. 
+
+Convert the penguins_long dataset back to a wide format using the `pivot_wider()` function. The `pivot_wider()` function takes the following arguments: `names_from` and `values_from`. The `names_from` argument specifies the column that will be used to create new columns, and the `values_from` argument specifies the column that will be used to populate the new columns. Try it below by replacing the underscore area with pivot_wider and the appropriate arguments. If you get stuck, you can try a hint:
+
+
+```{r pivot-wider, exercise = TRUE}
+penguins_long |>
+  ___
+```
+
+```{r pivot-wider-hint}
+penguins_long |>
+  pivot_wider(names_from = ___, values_from = ___)
+
+```
+
+```{r pivot-wider-solution}
+penguins_long |>
+  pivot_wider(names_from = "island", values_from = "mean_weight")
+```
+
+### Coverting Wide Data to Long
+
+Now let's covert the dataset back to its wide format by using the `pivot_longer()` function. The `pivot_longer()` function takes the following arguments: `cols`, `names_to`, and `values_to`. The `cols` argument specifies the columns that will be used to create a new column. For this argument, you will need to be explicit and use a vector in the form of `c("colname1", "colname2", "colname3")`.
+
+Vectors are the simplest form of data structure in R. They are a collection of elements such as numeric, character, or logical. When used in a function argument, vectors allow you to pass multiple values to a single argument. Function behavior in R is contextually dependent on the vector's contents which can be of the same or mixed types (ex.: numeric and string).  R's flexibility here is not as present in Python where you would need to utilize a list, numpy array or named Pandas series for the same values, with the type dependent on the content. For this exercise, think of the vector like a simple Python list containing strings.
+
+The second argument the `names_to` argument specifies the column that will be used to populate the new column. The `values_to` argument specifies the source of data that will be used to populate the new columns. Empty values will contain `N/A`.  Try it below by replacing the underscore area with pivot_longer and the appropriate arguments. If you get stuck, you can try a hint:
+
+```{r pivot-longer, exercise = TRUE}
+penguins_wide |>
+  ___
+```
+
+```{r pivot-longer-hint}
+penguins_wide |>
+  pivot_longer(cols = ___, names_to = ___, values_to = ___) 
+```
+
+```{r pivot-longer-solution}
+penguins_wide |>
+  pivot_longer(cols = c("Dream", "Torgersen", "Biscoe"), names_to = "island", values_to = "mean_weight")
+```
+
+### Pivoting On Columns with Wildcards
+
+Many real-world datasets have time-based or repeated measures (e.g., yearly_sales_2018, yearly_sales_2019) that contain the same starting characters and unique ends. This format is difficult to work with analytically. For example, to create a scatter-plot of the data you need to have a year column to access for the x-axis and associated values for those years in column(s) you can use to populate the y-axis. For these cases, you can use the `pivot_longer()` function with the `cols` argument set to `starts_with("XXX")` to pivot on all columns that start with "XXX".
+
+Let's look at our some penguins data in this format and then work with `pivot_longer` to pivot the data from the three weight columns into two: one containing the year of measurement and the other containing the relevant average weight:
+
+```{r, echo = TRUE}
+penguin_weights # view the sample dataset
+```
+
+```{r wildcard-pivot, exercise = TRUE}
+penguin_weights |>
+  # enter common prefix to select all columns starting with that string
+  pivot_longer(cols = starts_with("___"),
+               # name the new column that will contain the year
+               names_to = "___", 
+               # prefix to ignore. will draw what is left for new column names
+               names_prefix = "weight_",
+               # name the new value column that will contain the weights
+               values_to = "___") 
+```
+
+```{r wildcard-pivot-hint}
+penguin_weights |>
+  pivot_longer(cols = starts_with("weight"), names_to = "___", names_prefix = "weight_", values_to = "___")
+```
+
+```{r wildcard-pivot-solution}
+penguin_weights |>
+  pivot_longer(cols = starts_with("weight"), names_to = "year", names_prefix = "weight_", values_to = "weight")
+```
+
+
+## Combining Datasets Using Joins
+
+Now let's move on to combining two datasets using joins: `states_info` and `state_crime`. The `states_info` dataset contains information about the land area and region of each state, while the `state_crime` dataset contains crime statistics for each state. Let's join these datasets by matching the state names to combine the information.
+
+First, examine the contents of each dataset:
+```{r, echo = TRUE}
+states_info
+state_crime
+```
+
+Selecting the type of join depends on the data you want to keep from each dataset you are combining The available types of joins are full, inner, left, and right joins. You need to understand each type of join so you do not accidentally lose data you need. You also need to select the columns to join on very carefully as the match needs to be identical. If merging on states, for example, "you need to ensure the state names are identical in both datasets."Colorado", "colorado", "CO", and "COLORADO" are all unique. Prior to combining datasets, be familiar with each dataset to determine if you need to manipulate a column's case or format to ensure the data is consistent and identical between the datasets. 
+
+It is also helpful if the column names are the same in both datasets. If they are not, you can use the `rename()` function to force column names to be the same or you can use  `join_by` in the `by` argument to specify the columns to join on. For example `by = join_by(a == b)` will match `x$a` to `y$b`. If the column names match, you can simply use `by = join_by(a)`. View the help documentation for the join functions to see more of the available arguments and options by typing `?left_join` or `?right_join` in the R console.
+
+### Left Join
+
+Left joins are used to keep all rows from the left data frame and merge matching rows from the right data frame. Any unmatched rows will have NA values in the columns corresponding to the right data frame.
+
+Let's look at a subset of states keeping only those in the South and then combine it using various joins with data from state_crime. This imbalance will illustrate which dataset is used as a key if any data is discarded when there is not a match. 
+
+
+
+```{r left-join-data, echo = TRUE}
+southern_states <- states_info |>
+  filter(region == "South")
+
+southern_states
+```
+
+Try using `left_join()` to keep all rows from `southern_states` and merge matching rows from `state_crime.` The `left_join()` function takes the following arguments: `x`, `y`, and `by`. The `x` argument specifies the left data frame, the `y` argument specifies the right data frame, and the `by` argument specifies the column(s) to join on.
+
+Note: When using pipelines, `x` is understood as the dataset you are piping into the function so you can skip that argument. Replace the underscore area in the code block below with `left_join()` and the arguments `y`, and `by`. If you get stuck, try a hint:
+
+```{r left-join, exercise = TRUE}
+southern_states |>
+  ___(y = ___, by = "___")
+```
+
+```{r left-join-hint}
+southern_states |>
+  left_join(y = state_crime, by = "___")
+```
+
+```{r left-join-solution}
+southern_states |>
+  left_join(y = state_crime, by = "state")
+```
+
+### Right Join
+
+Right joins are used to keep all rows from the right data frame and merge matching rows from the left data frame. Any unmatched rows will have NA values in the columns corresponding to the left data frame. Arguments are the same as `left_join()` above:
+
+```{r right-join, exercise = TRUE}
+southern_states |>
+  ___(y = ___, by = "___")
+```
+
+```{r right-join-hint}
+southern_states |>
+  right_join(y = state_crime, by = "___")
+```
+
+```{r right-join-solution}
+southern_states |>
+  right_join(y = state_crime, by = "state")
+```
+Notice that the area and region columns from the `southern_states` dataset are now combined with the crime statistics from the `state_crime` dataset. For states not in the Southern region, the combined dataset will have NA values in the columns corresponding to the crime statistics as that data was not available in the `southern_states` dataset. Try replacing `southern_states` with `states_info` to see the difference in output to better understand `right_join()`.
+
+Let's revisit the exercise above but we will flip the datasets `state_crime` and `southern_states` to see if there is a difference in the output.
+
+```{r right-join-flip, exercise = TRUE}
+state_crime |>
+  ___(y = ___, by = "___")
+```
+
+```{r right-join-flip-hint}
+state_crime |>
+  right_join(y = southern_states, by = "___")
+```
+
+```{r right-join-flip-solution}
+state_crime |>
+  right_join(y = southern_states, by = "state")
+```
+
+Now there are only 16 rows of data which matches the number of rows in the `southern_states` data set as the right data frame is the smaller of the two. This is a good example of how a right join can be used to keep all rows from the right data frame and keep only matching rows from the left data frame. This matches the output of our previous left join exercise where we kept all rows from the left data frame (which was `southern_states`) and only matching rows from the right data frame (`state_crime`).
+
+### Inner Join
+
+Inner joins are used to keep only the rows that have matching values in both data frames. Any unmatched rows will be dropped. Available arguments are the same as `left_join()` and `right_join()` above:
+
+```{r inner-join, exercise = TRUE}
+states_info |>
+  ___(y = ___, by = "___")
+```
+
+```{r inner-join-hint}
+states_info |>
+  inner_join(y = state_crime, by = "___")
+```
+
+```{r inner-join-solution}
+states_info |>
+  inner_join(y = state_crime, by = "state")
+```
+
+Inner joins are helpful when you only want to keep rows that have matching values in both datasets. This can be useful when you want to analyze data that is consistent across both datasets. Try running the code block above with `southern_states` instead of `states_info` to see the difference in the output when using an inner join or flip the datasets `state_crime` and `states_info` to see if there difference in the output. Using summary functions like `summary()` or `glimpse()` on the source and joined datasets can help you verify the join worked as expected.
+
+## Test Your Understanding of Pivots and Joins
+
+Test your understanding of pivots joins by answering the following questions:
+
+```{r, join-question, echo = FALSE}
+question("Which of the following statements about joins is true?",
+  answer("`left_join()` keeps all rows from the left table and matches data from the right.", correct = TRUE),
+  answer("`inner_join()` keeps all rows from both tables."),
+  answer("`right_join()` discards all unmatched rows."),
+  answer("`left_join()` removes non-matching rows from the left table."),
+  random_answer_order = TRUE,
+  allow_retry = TRUE
+)
+```
+
+```{r, inner-join-question, echo = FALSE}
+question("If a key column in one dataset contains values not found in another dataset, what happens in an `inner_join()`?",
+  answer("Only matching rows will be kept.", correct = TRUE),
+  answer("All rows from the left dataset are kept."),
+  answer("All rows from both datasets are kept."),
+  answer("Missing values are filled with NA."),
+  random_answer_order = TRUE,
+  allow_retry = TRUE,
+  post_message = "An inner join keeps only rows with matching key values in both datasets. If your resulting dataset is empty, check the key columns in both datasets to ensure they match."
+)
+```
+
+```{r, left-join-question, echo = FALSE}
+question("What happens to rows in the left dataset that do not have a match in the right dataset in a `left_join()`?",
+  answer("They are removed."),
+  answer("They are kept with NA values in the columns from the left dataset."),
+  answer("They are removed along with the matching rows."),
+  answer("They are kept with NA values in the columns from the right dataset.", correct = TRUE),
+  random_answer_order = TRUE,
+  allow_retry = TRUE,
+  post_message = "A left join keeps all rows from the left dataset and only rows from the right dataset that match on the given key."
+)
+```
+
+```{r, join-short-answer, echo = FALSE}
+question_text(
+  "You have two datasets: One contains student names and IDs, and the other contains test scores but only for students who took the test. Which join would you use to keep all students in the first dataset, even if they don’t have a test score?",
+  answer("left_join", correct = TRUE),
+  answer("left", correct = TRUE),
+  answer("left join", correct = TRUE),
+  answer("left_join()", correct = TRUE),
+  answer("Hint: You want to keep all students from the first dataset, even if they are missing from the second."),
+  allow_retry = TRUE,
+  post_message = "A left join keeps all rows from the left dataset and matches data from the right dataset. Note: Any data from the right dataset (student test score) without a match on the key column(s) in the left (no student ID) will be discarded. Use functions like summary() or glimpse() on source and joined datasets to verify the join worked as expected."
+)
+```
+
+```{r, pivot-longer-question, echo = FALSE}
+question("Which scenario would require using `pivot_longer()`?",
+  answer("Converting multiple columns containing similar information into a single column.", correct = TRUE),
+  answer("Creating multiple new columns based on a single categorical variable."),
+  answer("Merging two datasets together."),
+  answer("Summarizing data by group."),
+  random_answer_order = TRUE,
+  allow_retry = TRUE,
+  post_message = "pivot_longer() allows for easier data analysis by transforming data such that individual observations are in individual rows"
+)
+```
+
+```{r, pivot-wider-question, echo = FALSE}
+question("Which scenario would require using `pivot_wider()`?",
+  answer("Converting multiple columns containing similar information into a single column."),
+  answer("Merging two datasets together."),
+  answer("Creating multiple new columns based on a single categorical variable.", correct = TRUE),
+  answer("Summarizing data by group."),
+  random_answer_order = TRUE
+)
+```
+
+## Conclusion
+
+In this worksheet, you learned how to reshape data using `pivot_longer()` and `pivot_wider()` and how to combine datasets using `left_join()`, `right_join()`, and `inner_join()`. These functions are essential for data wrangling and will help you prepare your data for analysis and visualization.
+
+Remember, data wrangling is an iterative process, and you may need to try different approaches to get the desired output. If you get stuck, don't hesitate to consult the documentation or ask for help from the R community. After you close this window, explore the datasets you worked with by accessing the tables in the top right corner of the RStudio window. You can also look at the documentation for the different functions you explored in the help panel in the bottom right corner of the RStudio window.
+
+The Console tab in the bottom panel of R-Studio is another good place to explore the functions covered. Suggestions are to try `?pivot_longer`, `?pivot_wider`, `?left_join`, `?right_join`, and `?inner_join` to view function documentation to see additional arguments and options available for each functions. A long-form document with step-by-step guidance on pivot functions in R-Studio can be accessed by typing `vignette("pivot")` into the R-console pane.
+
+R-Code Debugging Tip: if you are using a long pipeline for data wrangling and your output isn't what you expect or you want to make sure you understand what is happening at each step, try running each line of the pipeline, building it up from its smaller pieces and checking the output at each step. This will help you not only identify where the issue is and fix it but to get a better understanding of the data wrangling occuring within each function.
+
+You can explore a variety  of "cheat sheets" to help you with data wrangling topics. They are available in the Help menu at the top of R-Studio and are available on the Posit website. These "cheat sheets" are a great resource to help you remember the correct syntax and a summary of parameter options available for each function. Selecting the "Browse Cheat Sheets" option under "Cheat Sheets" in the Help menu above will take you directly to the Posit library (https://posit.co/resources/cheatsheets/) of package reference sheets to help you with your data wrangling tasks. Another recommended library of community developed reference sheets including those covering data wrangling topics touched on in this worksheet's exercises can be found here: https://www.datacamp.com/cheat-sheet/category/r-programming
+
+
+

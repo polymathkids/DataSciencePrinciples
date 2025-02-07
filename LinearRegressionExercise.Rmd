@@ -1,0 +1,118 @@
+---
+title: "LinearRegressionExercise"
+author: "Sarah Evans"
+date: "2025-01-23"
+output: html_document
+---
+
+## Simple Linear Regression Exercise: mtcars Dataset
+
+This worksheet will walk through a simple linear regression in R using the tdyverse package. We will use both geom_smooth() and the lm() linear regression model to visualize the regression and to view calculations od the slope, intercept and p-value as shown in lecture.
+
+```{r}
+library(tidyverse) # load the tidyverse library}
+
+data("mtcars") # load the mtcqrs built-in dataset
+
+```
+
+## Explore the dataset
+
+The mtcars dataset contains information about various car models. Key variables for our regression exercise include: mpg (miles per gallon) which we will use as the dependent variable (Y), and wt (weight of the car, in 1000 lbs) which we will use as the independent variable (X).
+
+```{r}
+# in R, use keyboard shortcuts to run individual lines.
+# First, Place your cursor on the line of code you want to run.
+# In windows, the shortcut is Ctrl + Enter. For Macs, use Command + Enter.
+
+# glimpse() and head() are both good ways to get a quick look at the dataset
+glimpse(mtcars)
+
+# Use summary() for a quick statistical summary of the key variables
+# the format to access columns in the dataset is
+# to use the '$' sign between the dataset name and the column name:
+summary(mtcars$mpg)
+summary(mtcars$wt)
+```
+
+## Relationship between wt and mpg
+
+As in lecture, you can use a scatterplot to quickly assess if there is a relationship between two variables:
+
+```{r}
+# Use ggplot to create a scatterplot
+
+ggplot(mtcars, aes(x = wt, y = mpg)) +   geom_point(color = "blue") + # Scatterplot points
+  labs(title = "Scatterplot", x = "Car Weight (1000 lbs)", y = "Miles per Gallon (mpg)") +
+  theme_minimal()
+```
+
+Now we will use geom_smooth() to add a regression line to our scatterplot. I have this set up to also show a grey confidence interval around the regression line. You can adjust the confidence interval by changing the 'level' parameter in geom_smooth(). To remove it, you can set level = 0. The default is 0.95 for a 95% confidence interval so it's not shown below but feel free to play with the code, break it, add more parameters, change the width of the confidence level band, and observe the effects on the visualization:
+
+```{r}
+# Use ggplot to create a scatterplot
+ggplot(mtcars, aes(x = wt, y = mpg)) +
+  geom_point(color = "blue") + # Scatterplot points
+  geom_smooth(method = "lm", color = "red") + # Regression line
+  labs(
+    title = "Scatterplot with Regression Line",
+    x = "Car Weight (1000 lbs)",
+    y = "Miles per Gallon (mpg)"
+  ) +
+  theme_minimal()
+
+```
+
+## Run a Linear Regression Model
+
+Now we will create a linear model that we can then run different analysis on and get a peek into the variables for the model as shown in lecture.
+
+```{r}
+
+library(tidyverse) # load the tidyverse library}
+
+data("mtcars") # load the mtcqrs built-in dataset
+summary(mtcars)
+
+# Create a linear model
+model <- lm(mpg ~ wt, data = mtcars) # mpg is the dependent variable, wt is the independent variable
+summary(model) # Display the model summary
+
+print(model$coefficients) # Print the model coefficients
+
+# display the data type of mtcars, model, and lm
+class(mtcars)
+class(model) # model is an instance of the lm class
+class(lm)
+
+summary(lm)
+```
+
+As you can see from the model summary above, the slope of the line is -5.3445, the intercept is 37.2851, and the p-value is 6.11e-06. This means that the relationship between weight and miles per gallon is statistically significant and would support a hypotheses of a negative relationship between the two variables.
+
+## Using the lm() model in ggplot()
+
+Using geom_smooth() is a fast way to view a linear model but it has limitations in not being able to see the paramters of the model. If you want to use the lm() model in ggplot(), we can visualize the regression line and the data points as shown below. We will be pulling from the lm() model using the coef() function to get the slope and intercept of the line. You can peek into the help files for each of these functions by typing ?lm, ?coef, and ?geom_abline in the console or by searching for them in the help tab in RStudio's bottom right pane.
+
+```{r}
+# Use ggplot to create a scatterplot and generate a regression line from the lm() model
+ggplot(mtcars, aes(x = wt, y = mpg)) +
+  geom_point(color = "blue") + # Scatterplot points
+  geom_abline(intercept = coef(model)[1], slope = coef(model)[2], color = "red") + # Regression line
+  labs(
+    title = "Scatterplot with Regression Line",
+    x = "Car Weight (1000 lbs)",
+    y = "Miles per Gallon (mpg)"
+  ) +
+  theme_minimal()
+```
+
+
+```{r}
+amazon <- read_tsv(
+  "https://github.com/Principles-of-Data-Science/datasets/raw/refs/heads/main/amazon_reviews_us_Digital_Software_v1_00.tsv.gz",
+  col_types = "cccccccdddccccD"
+) # Load the Amazon dataset
+glimpse(amazon)
+```
+
