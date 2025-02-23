@@ -1,0 +1,590 @@
+---
+#############################################################
+#                                                           #
+# Click on "Run Document" in RStudio to run this worksheet. #
+#                                                           #
+# libraries needed: MASS, learnr, tidyverse, broom          #
+#                                                           #
+#############################################################
+title: "Prediction from Linear Models"
+author: "Sarah Evans"
+output: learnr::tutorial
+runtime: shiny_prerendered
+---
+
+```{r setup, include=FALSE}
+library(learnr)
+knitr::opts_chunk$set(echo = FALSE, comment = "")
+library(MASS) #install with install.packages("MASS") in your R console or via Install in the 'Packages' tab of R-Studio in the bottom right pane
+library(tidyverse)
+library(broom)
+boston <- MASS::Boston 
+lm_model <- lm(medv ~ lstat, data = boston)
+lm_model_log <- lm(log(medv) ~ lstat + rm + ptratio, data = boston)
+
+```
+
+## **Introduction**
+
+This interactive worksheet explores **data prediction `predict()`** from **linear regression models `lm()`**.
+
+On the following pages are exercises that will guide you through the use of the predict function on a linear regression model. The exercises will walk you through the process of creating a linear regression model and then using the predict function to make predictions based on the model. The exercises will also cover the use of the predict function to make predictions based on new data.
+
+You will explore the Boston data set, which records the `medv` (median house value) for 506 census tracts in Boston from 1978. We will seek to predict `medv` using 12 predictors such as `rm` (average number of rooms per house), `age` (average age of houses), and `lstat` (percent of households with low socioeconomic status). We will model how median home values (`medv`) depend on other predictors, such as `lstat` (percent of lower-income population) and `rm` (average number of rooms per dwelling).
+
+Within this worksheet you will:
+
+	1.	Explore the dataset and perform basic data wrangling.
+	2.	Fit a simple linear regression model.
+	3.	Interpret coefficients, p-values, and confidence intervals.
+	4.	Visualize residuals to assess model assumptions.
+	5.	Use the predict() function to make predictions for new data.
+	
+As a side note, the Boston Housing dataset we will explore is a valuable resource for learning about regression modeling, but it also serves as an important case study in ethical data science. Data is inherently expensive to collect and collate so many datasets are reused and repurposed. The Boston Housing dataset is no exception. It was originally collected by Harrison and Rubinfeld in 1978 and has been used in countless studies since. However, the dataset has been criticized for its racial biases and economic inequities. Understanding its historical biases is essential for responsible model construction, ensuring that predictive models do not reinforce racial and economic inequities. When working with datasets, always consider the origins, limitations, and ethical implications of the data you are using.
+
+
+## Exploring the Dataset
+
+We will now review description of the dataset and the format of the parameters available, viewed in the help pane of the R-Studio window. Alternatively, you can type `?Boston` into the R console. We will start by using the `lm()` function to fit a simple linear regression `lm()`
+model, with `medv` as the response and `lstat` as the predictor. The basic syntax is `lm(y∼ x, data)`, where `y` is the response, `x` is the predictor, and `data` is the data set in which these two variables are kept.
+
+```{r dataset-loading, echo = TRUE}
+boston <- MASS::Boston  # load the Boston dataset, a dataset containing information about housing in the Boston area.
+head(boston)
+?Boston # uncomment to view the documentation for the Boston dataset
+
+```
+
+## Acknowledging Dataset Assumptions and Biases
+
+A large part of data science includes validating assumptions, uncovering correlations, and of course identifying patterns in data. In this exercise, we will explore the Boston housing dataset from the MASS dataset library to identify the variables that correlate with housing prices (`medv`). This will help us to identify which variable(s) to use as a predictor in both simple and multiple linear regression models. When exploring any data, you want to be as objective as possible while acknowledging your own assumptions and possible biases as well as any limitations or biases present in the dataset. You should also acknowledge how well trained that model can be. The Boston dataset only has 506 observations, a relatively small dataset. **Any model is only as good as the data that informs it.** While we will construct linear models to make predictions on housing prices, be aware of the coverage and applicability that prediction has. Would this dataset be appropriate to predict 2025 Boston suburb housing prices? Why or why not? What about pricing a home in another US city like San Francisco or a city in a different country like Barcelona, Spain? The predictive power of any model is limited by the data it is trained on. A good data scientist should be aware of limitations of their data and the assumptions they make when building a model, They should be especially aware of the coverage the data has when applying a model for predictions as the model could unintentionally reinforce any biases present in the data.
+
+The Boston Housing dataset, originally collected in 1978, is widely used in examples of machine learning and statistics functions and exploring concepts like linear regression models to predict median housing values outside of the those present in the dataset. You can access and find this dataset on many sites like Kaggle and it is built-in to several libraries and packages like MASS, sci-kit-learn, and keras. The Boston dataset contains variables that reflect the racial and economic biases present in US society at the time. When working with dataset, it is crucial to critically examine it for implicit biases and to consider the ethical implications of using the data in predictive modeling. For example, one of the more concerning variables in the Boston Housing dataset is `blacks`, which encodes the race of residents in a neighborhood into a quadratic formula. A model using this parameter would incorporate a notion that the proportion of Black residents in a neighborhood has a measurable influence on housing prices. The presence of this variable in the dataset reflects systemic racial discrimination that was prevalent in housing policies and lending practices in the U.S., such as redlining, where banks and real estate agencies deliberately excluded black communities from home loans and investment. Several other variables in the dataset highlight economic disparities, which were also shaped by similar historical housing policies such as `lstat` (lower status population percentage), `rm` (number of rooms per dwelling) and `zn` (proportion of residential land zoned for large lots). Areas with high `zn` values often had zoning laws designed to exclude low-income and minority families by requiring large lot sizes and single-family homes, making housing in those areas less affordable and excluding construction of higher density housing like apartments or other multi-family dwellings.
+
+When exploring the relationship of some of these variables to housing prices (`medv`) in this exercise, keep in mind that these variables would not be not predictive of housing prices in other times or cities and the model predictions may reflect historical biases such as exclusionary zoning laws designed to exclude low-income and minority families by requiring minimum lot sizes, favoring single-family homes, enforcement of discriminatory lending practices, and other related bias. If government entities or financial institutions used biased datasets like this one to construct models used to inform decisions such as housing value, tax assessments, whether an applicant qualifies for a loan, or to determine zoning laws they would risk reinforcing any present dataset biases on housing prices and housing access. Incomplete, misunderstood, and historically problematic data can negatively influence algorithms or models built with it. The mathematics of algorithms and models matter just as much as the data they are trained on. When relying on the outputs of algorithms and models, like navigation directions or mortgage approvals, we want those outputs to be both fair and accurate. A good data scientist should always assess the viability and fitness of datasets they intend to train their models and algorithms on.
+
+
+``` {r quiz1, echo = FALSE}
+quiz(
+  question("Which variable do you think will be most strongly correlated with housing prices `medv` in the Boston dataset?",
+    answer("lstat (Lower-income percentage)", correct = TRUE),
+    answer("chas (Charles River adjacent)"),
+    answer("zn (Residential zoning proportion)"),
+    answer("indus (Industrial area proportion)")
+  )
+)
+```
+## Determining Strength of Correlation
+
+In lecture, we discussed the assumption that the errors are not correlated with the predictors in the model and noted that if you do not include a predictor in the model that should be in there, it will get absorbed by the error term. This could potentially make the errors correlated with our predictors and violate that assumption. To start, we will construct a simple linear model using the strongest predictor of housing price (`medv`) and will then explore a multiple linear regression model with additional predictors. 
+
+Let's determine the strength of correlation between `medv` and each of the other variables in the dataset. We will use the `cor()` function to calculate the correlation between `medv` and each of the other variables and return a matrix of correlations.
+
+
+```{r correlation-strength}
+# Compute correlations
+correlations <- boston |>
+  dplyr::select(-medv) |> # Remove target variable
+  cor(boston$medv) |>  # Correlation with medv
+  as.data.frame() |>
+  rename(correlation = 1) |>
+  arrange(desc(abs(correlation)))  # Sort by absolute correlation
+
+# Display top predictors
+correlations
+```
+
+The correlation table displays the strength of the relationship between `medv` and each of the other variables in the dataset. The closer the correlation is to 1 or -1, the stronger the positive or negative relationship that variable has on the depdendent variable. The closer the correlation is to 0, the weaker the relationship. An absolute value of the correlation below 0.5 is considered weak, between 0.5 and 0.7 is considered moderate, and above 0.7 is considered strong.
+
+The `cor()` formula automatically standardizes each variable (subtracting the mean and dividing by the standard deviation), meaning that variables with different units (e.g., `rm` in number of rooms vs. `crim` in crime rate) do not need to be normalized for correlation calculation as any difference in the magnitudes of parameter values will not affect the correlation result.
+
+The `lstat` variable has the strongest correlation with `medv`, followed by `rm` and `ptratio`. These variables will be used as predictors in our linear regression models. First, we will explore the strongest correlated variable `lstat` with `medv` by constructing a simple linear model and then plotting the data.
+
+## Constructing a simple linear regression model
+
+Construct a linear regression model using `medv` as the response and `lstat` as the predictor, then view the summary of the model. Finally, augment the original dataset with the residuals and fitted values from the model as shown in lecture
+Replace the underscores in the code block below with the appropriate function and arguments. If you get stuck, try a hint:
+
+```{r linear-model, exercise = TRUE}
+# Fit linear model
+lm_model <- ___
+
+# View summary of the model
+summary(___)
+
+# Augment the original dataset with the residuals and fitted values from the model to make it easier to visualize the residuals
+lm_model.fit <- ___
+
+```
+
+```{r linear-model-hint}
+# Fit linear model
+lm_model <- lm(medv ~ ___, data = ___)
+
+# View summary of the model
+summary(lm_model)
+
+# Augment the original dataset with the residuals and fitted values from the model to make it easier to visualize the residuals
+lm_model.fit <- lm_model |>
+  augment(___)
+
+```
+
+```{r linear-model-solution}
+# Fit linear model
+lm_model <- lm(medv ~ lstat, data = boston)
+
+# View summary of the model
+summary(lm_model)
+
+```
+
+The p-value shown in the summary function is a statistical measure that helps determine the significance of your results in hypothesis testing. It indicates the probability of observing the data, or something more extreme, if the null hypothesis is true; a low p-value suggests that the null hypothesis may be rejected. The null hypothesis for this model is that there is no relationship between `lstat` and `medv`. Based on the instruction in lecture and the null hypothesis indicated, what does the model's p-value for `lstat` indicate?
+
+
+```{r quiz2, echo = FALSE}
+quiz(
+  question("What does the p-value for `lstat` indicate?",
+    answer("There is a significant relationship between `lstat` and `medv`.", correct = TRUE),
+    answer("There is no relationship between `lstat` and `medv`."),
+    answer("The effect of `lstat` is negligible.")
+  )
+)
+```
+
+
+##  Coefficients and Confidence Intervals
+
+The coefficients in the `lm_model` correspond to the intercept and slope of the regression line. The intercept is the expected value of `medv` when `lstat` is 0. The slope is the expected change in `medv` for a one-unit increase in `lstat`. For a linear regression in the form of `y = mx + b`. The predict() function on a model, uses the coefficients and intercepts to make predictions. The coefficients and intercepts are stored in the `coef` attribute of the model object. You can access the coefficients using the `coef()` function as shown below.
+The confidence intervals for the coefficients are also shown in the summary function. The confidence intervals indicate the range of values within which the true value of the coefficient is likely to fall and are calculated using the standard errors of the coefficients via the variance-covariance matrix of the model. You can access the confidence intervals calculated by the model using the `confint()` function as shown below. The Intercept value is the expected value of `medv` when `lstat` is 0. The `lstat` coefficient is the expected change in `medv` for a one-unit increase in `lstat`. The confidence intervals for the coefficients indicate the range of values within which the true value of the coefficient is likely to fall:
+
+```{r manual-coefficient-extraction, echo = TRUE}
+
+lm_model$coef
+confint(lm_model)
+
+# access individual values from the coefficients and confidence intervals using indexing
+# note that this is not 0-indexed like python lists
+
+coef(lm_model)[1] #Intercept
+coef(lm_model)[2] #lstat coefficient
+
+```
+
+Using the values of the coefficients and intercepts of a linear model, you can manually calculate and predict new values. Using the numbers in the output of the code block above, manually calculate the expected median value of an owner occupied home `medv` in $1000s when  located in a section of town where 10% of the population is categorized as within "lower socioeconomic status" using the basic formula for a linear regression model: `y = mx + b`. If you get stuck, try a hint:
+
+```{r calculate-medv, exercise = TRUE}
+# y = mx + b where y = medv predicted value
+# x = lstat value, m = lstat coefficient, b = intercept
+___ * ___ + ___ # = y (pred_house_value)
+
+```
+
+```{r calculate-medv-hint}
+# y = mx + b where y = medv value
+# x = lstat value, m = lstat coefficient, b = intercept
+___  * 10 + ___ # = y (pred_house_value)
+
+```
+
+```{r calculate-medv-solution}
+# y = mx + b where y = medv value
+# x = lstat value, m = lstat coefficient, b = intercept
+-0.9500494 * 10 + 34.5538 # = y (pred_house_value)
+
+```
+
+The predicted median value of an owner occupied home `medv` in \$1000s when located in a section of town where 10% of the population is categorized as within "lower socioeconomic status" is \$25,053. The range of expected values for `medv` when `lstat` = 10% within a 95% confidence interval is \$23,187 to \$26,920. 
+
+```{r quiz3, echo = FALSE}
+quiz(
+  question("What does the confidence interval for `lstat` suggest?",
+    answer("It gives a range of likely values.", correct = TRUE),
+    answer("It shows how spread out the data is."),
+    answer("It confirms the model is incorrect.")
+  )
+)
+
+```
+
+## Using the Predict Function on a Simple Linear Model
+
+Next, we will use the model to provide these same values by employing the `predict()` function. The `predict()` function takes a model object and a new data frame as arguments and returns a data frame of predictions. The `predict()` function uses the same coefficients and intercepts of the model you used in your manual caluclations to make predictions. The parameters of `predict()` are the model object and the new data you want to use the model to provide a prediction on.  The new data should be in a data frame with the same column names as the original data frame used to fit the model. If you have multiple values you want to predict, you can pass a data frame with multiple rows to the `predict()` function. The `predict()` function will then return a data frame of predictions for each row in the new data frame. Using the `predict()` function and the constructed lm_model, calculate a single predicted housing value for a home in an area that has a lstat value of 10. Replace the underscores in the code block below with the appropriate function and arguments. If you get stuck, try a hint:
+
+```{r predict-medv, exercise = TRUE}
+# create a new data frame with the value of lstat you want to predict medv for
+newdata <- data.frame(___ = ___)
+
+# Use the predict() function to make predictions for newdata.
+# Include interval = "confidence" to get the confidence interval for the prediction
+___(___, newdata, interval = ___)
+```
+
+```{r predict-medv-hint}
+# create a new data frame with the value of lstat you want to predict medv for
+newdata <- data.frame(lstat = ___)
+
+# Use the predict() function to make predictions for newdata
+# Include interval = "confidence" to get the confidence interval for the prediction
+predict(lm_model, newdata, interval = ___)
+```
+
+```{r predict-medv-solution}
+# create a new data frame with the value of lstat you want to predict medv for
+newdata <- data.frame(lstat = 10)
+
+# Use the predict() function to make predictions for newdata
+# Include interval = "confidence" to also get the confidence interval for the prediction
+predict(lm_model, newdata, interval = "confidence")
+``` 
+
+```{r quiz4, echo = FALSE}
+quiz(
+  question("If `lstat` is 20%, what is the predicted range of median home values?",
+    answer("About $15K - $17K", correct = TRUE),
+    answer("About $33K - $35K"),
+    answer("About $5K - $8K")
+  )
+)
+```
+
+
+## Visualizing Residuals
+
+How accurate are these predictions? In lecture, we reviewed the assumptions of a linear model and looked at a plot of the residuals to assess those model assumptions to help us determine if an adjustment to the model may be needed. A linear regression assumes:
+
+	1.	Linearity between predictors and outcome.
+	2.	Constant variance (homoscedasticity).
+	3.	Normal distribution of residuals.
+	
+	
+Let's look at the distribution of residuals of our simple linear model. To view the code that generates these visuals, you can exit the worksheet and view the code in the R console or R-Studio. The residuals are the differences between the observed values of the outcome variable and the values predicted by the model. The residuals should be normally distributed with a mean of 0 and constant variance. If the residuals are not normally distributed, this may indicate that the model is not appropriate for the data or that the relationship between the predictors and the outcome is not linear. If the residuals show a pattern in the residual vs. fitted plot, this may indicate that the model is not capturing the relationship between the predictors and the outcome. If the residuals show unequal variance across different levels of the predictors, this may indicate that the model violates the assumption of homoscedasticity.
+
+
+```{r visualizing-residuals, echo = FALSE}
+# Augment the original dataset with the residuals and fitted values from the model to make it easier to visualize the residuals
+lm_model.fit <- lm_model |> augment(boston)
+
+# Residual vs. Fitted plot
+ggplot(lm_model.fit, aes(.fitted, .resid)) +
+  geom_point(alpha = 0.5) +
+  geom_hline(yintercept = 0,
+             linetype = "dashed",
+             color = "red") +
+  geom_smooth(method = "gam") +
+  labs(title = "Residual vs Fitted Plot", x = "Fitted Values", y = "Residuals") +
+  theme_minimal()
+
+#qq-plot
+ggplot(lm_model.fit) +
+  geom_qq(aes(sample = .resid), size = 4, alpha = 0.5) +
+  geom_qq_line(aes(sample = .resid), linewidth = 1) +
+  labs(title = "QQ Plot: Theoretical vs. Sample", x = "Theoretical Quantiles", y = "Sample Quantiles") +
+  theme_minimal()
+
+# histogram of residuals
+ggplot(lm_model.fit, aes(x = .resid)) +
+  geom_histogram(
+    binwidth = 2,
+    fill = "blue",
+    color = "black",
+    alpha = 0.7
+  ) +
+  geom_rug(sides = "b", color = "red") + # a rug plot shows the density/distribution of the residuals
+  labs(title = "Histogram of Residuals", x = "Residuals", y = "Frequency") +
+  theme_minimal()
+```
+
+```{r quiz5, echo = FALSE}
+question("Based on the provided fitted vs. residuals plot, QQ-plot, and histogram of residuals, select all that apply regarding the residual distribution and model fit.",
+  answer("The residuals show a non-linear pattern in the fitted vs. residuals plot, indicating a potential issue with model specification.", correct = TRUE),
+  answer("The residuals are normally distributed with no apparent skew.", correct = FALSE, 
+         message = "Check the QQ-plot and histogram again. Do the residuals follow a normal distribution?"),
+  answer("The QQ-plot suggests right-skewed residuals, meaning the error terms are not normally distributed.", correct = TRUE),
+  answer("The residual histogram indicates left-skew, suggesting the model is overestimating some values.", correct = FALSE,
+         message = "Is there evidence of left-skew? Consider checking the histogram."),
+  answer("There is evidence of heteroscedasticity (unequal variance) or non-linearity in the residuals, as seen in the residual vs. fitted plot.", correct = TRUE),
+  answer("The model meets all assumptions of linear regression.", correct = FALSE,
+         message = "If there is non-linearity or heteroscedasticity, the model likely violates some assumptions."),
+  allow_retry = TRUE,
+  random_answer_order = TRUE
+)
+
+```
+
+
+As stated in lecture, when we see a skew of residuals in the histogram or in the qq-plot, non-linearity of the residuals or unqeual variances in teh residuals, we should investigate which of the linear model assumptios has been violated. When error terms are not normally distributed, you will see a skew in the distribution of residuals. This indicates that the model underestimated some values and violates the assumption of normally distributed errors. Any non-linearities present in the residual vs. fitted plot may indicate that the relationship between the predictors and the outcome is not adequately captured by a linear model. We may have omitted a predictor that should be included in the model or we may need to transform the predictors or the outcome to make the relationship linear. Unequal variances in the residuals may indicate that the model violates the assumption of homoscedasticity which expects the variance of the errors to be constant across all levels of the predictors. When the variance is not equal, this may indicate that the model is not adequately capturing the relationship between the predictors and the outcome or that the model is not appropriate for the data.
+
+**Possible Remedies**
+
+  - Apply a transformation to the dependent variable (e.g., log transformation) to reduce skewness.
+  - Introduce polynomial terms or interaction terms to capture non-linearity.
+  - Consider a different regression model (e.g., Generalized Additive Models (GAMs) or tree-based models).
+  - Check for omitted variables that might be influencing the relationship in a non-linear way.
+  
+
+
+## Multiple Regression
+
+In our correlation table, we saw that `rm` and `ptratio` also had strong correlations with `medv`. Let's also try applying a log transformation to `mdev` to explore if it will account for the non-linearity we saw within the previous model. Let's construct a multiple regression model using `log(medv)` as the response and `lstat`, `rm`, and `ptratio` as predictors. We will use the `lm()` function to fit the model and the `summary()` function to view the summary of the model.
+Replace the underscores in the code block below with the appropriate function and arguments. If you get stuck, try a hint:
+
+```{r multiple-regression, exercise = TRUE}
+# Fit multiple regression model
+lm_model_log <- ___
+
+# View summary of the model
+summary(___)
+
+```
+
+```{r multiple-regression-hint}
+# Fit multiple regression model
+lm_model_log <- lm(log(___) ~ ___ + ___ + ___, data = ___)
+
+# View summary of the model
+summary(lm_model_multiple)
+
+```
+
+```{r multiple-regression-solution}
+# Fit multiple regression model
+lm_model_log <- lm(log(medv) ~ lstat + rm + ptratio, data = boston)
+
+# View summary of the model
+summary(lm_model_log)
+```
+
+
+
+```{r quiz7, echo = FALSE}
+quiz(
+  question("Does adding the more highly `rm` and `ptratio` and taking a log transformation of the dependent variable `mdev` improve the model (based on adjusted R²)?",
+    answer("Yes, the adjusted R² is higher.", correct = TRUE),
+    answer("No, adjusted R² decreased."),
+    answer("It stayed the same.")
+  )
+)
+```
+
+The adjusted R² value for the multiple regression model is higher than the adjusted R² value for the simple linear model, indicating that the multiple regression model may be a better fit for the data. Let's verify that the residuals are fairly normally distributed and there is less evidence of heteroscedasticity or non-linearity in those residuals. If so, we can use the predict function on the multiple regression model to make predictions for new data.
+
+## Visualizing Residuals on a Multiple Regression Model
+
+Let's view the residuals of the multiple regression model to assess the model assumptionsvia a residual vs. fitted plot, a QQ-plot, and a histogram of residuals to assess the model assumptions. Again, we want to see normally distributed residuals with a mean of 0 and constant variance. We do not want structure in the residuals that indicate a pattern in the residual vs. fitted plot as this may indicate that the model is not capturing the relationship between the predictors and the outcome. We also want equal variance across different levels of the predictors as evidence that the model adheres to the linear model assumption of homoscedasticity.
+
+```{r visualizing-residuals-multiple, echo = FALSE}
+# Augment the original dataset with the residuals and fitted values from the
+# multiple regression model to make it easier to visualize the residuals
+lm_model_log.fit <- lm_model_log |> augment(boston)
+
+
+# Residual vs. Fitted plot
+ggplot(lm_model_log.fit, aes(.fitted, .resid)) +
+  geom_point(alpha = 0.5) +
+  geom_hline(yintercept = 0,
+             linetype = "dashed",
+             color = "red") +
+  labs(title = "Residual vs Fitted Plot", x = "Fitted Values", y = "Residuals") +
+  theme_minimal()
+
+#qq-plot
+ggplot(lm_model_log.fit) +
+  geom_qq(aes(sample = .resid), size = 4, alpha = 0.5) +
+  geom_qq_line(aes(sample = .resid), linewidth = 1) +
+  labs(title = "QQ Plot: Theoretical vs Sample Quantiles", x = "Theoretical Quantiles", y = "Sample Quantiles") +
+  theme_minimal()
+
+# histogram of residuals
+ggplot(lm_model_log.fit, aes(x = .resid)) +
+  geom_histogram(
+    bins = 30,
+    fill = "blue",
+    color = "black",
+    alpha = 0.7
+  ) +
+  geom_rug(sides = "b", color = "red") + # a rug plot shows the density/distribution of the residuals
+  labs(title = "Histogram of Residuals", x = "Residuals", y = "Frequency") +
+  theme_minimal()
+```
+
+
+``` {r quiz6, echo = FALSE}
+quiz(question("Comparing the multiple linear regression fitted vs. residuals plot, QQ-plot, and histogram of residuals, to the simple linear model's plots, is the multiple regression a better fit for the data?",
+  answer("Yes, the multiple linear regression model has a better fit.", correct = TRUE),
+  answer("No, the simple linear model has a better fit."),
+  answer("They are equally good fits."),
+  allow_retry = TRUE,
+  random_answer_order = TRUE
+))
+```
+
+Much better! While not perfect, the residuals are more normally distributed and there is less evidence of heteroscedasticity or non-linearity in the residual plots. This model should provide better prediction values within the range of the given dataset. To explore additional metrics on various model fits and model comparisons, visit the appendix at the end of this worksheet.
+
+## Using the Predict Function on a Multiple Regression Model
+
+Let's use the `predict()` function to make and compare predictions for new data on two properties using the multiple regression model. We will create a new data frame with the values of `lstat`, `rm`, and `ptratio` we want to predict `medv` for. Suppose you want to compare two properties: Property 1 only has 6 rooms and is an in a area where `lstat` = 3%, the schools show a `pratio` of 16 pupils per teacher and it is priced at \$33K. Property 2 is bigger with 9 rooms and is an in a area where `lstat` = 10%, the schools show a `pratio` of 22 pupils per teacher and it is priced at \$25K. Which home price aligns more closely with the predicted price from the model?
+
+We will use the `predict()` function to make predictions for the new data. We will include `interval = "confidence"` to get the confidence interval for the prediction. Replace the underscores in the code block below with the appropriate function and arguments. If you get stuck, try a hint:
+
+```{r predict-medv-multiple, exercise = TRUE}
+# create a new data frame with the values of lstat, rm, and ptratio you want to predict medv for
+# Property 1 has 6 rooms, lstat = 3%, pratio = 16 
+# Property 2 has 8 rooms, lstat = 10%, pratio of 22
+newdata <- data.frame(___ = ___, ___ = ___, ___ = ___)
+
+# Use the predict() function to make predictions for newdata. Include the confidence interval for the prediction
+# Since we log-transformed the data, we need to exponentiate the predictions to get the original scale
+# note: we are ignoring the small bias term here introduced by the exponentiation (Jensen's inequality)
+exp(predict(___, newdata, interval = ___))
+
+```
+
+```{r predict-medv-multiple-hint}
+# create a new data frame with the values of lstat, rm, and ptratio you want to predict medv for
+# Property 1 has 6 rooms, lstat = 3%, pratio = 16 
+# Property 2 has 8 rooms, lstat = 10%, pratio of 22
+newdata <- data.frame(lstat = c(___), rm = c(___), ptratio = c(___)
+
+# Use the predict() function to make predictions for newdata. Include the confidence interval for the prediction
+# Since we log-transformed the data, we need to exponentiate the predictions to get the original scale
+# note: we are ignoring the small bias term here introduced by the exponentiation (Jensen's inequality)
+exp(predict(lm_model_log, newdata, interval = ___))
+```
+
+```{r predict-medv-multiple-solution}
+# create a new data frame with the values of lstat, rm, and ptratio you want to predict medv for
+# Property 1 has 6 rooms, lstat = 3%, pratio = 16 
+# Property 2 has 8 rooms, lstat = 10%, pratio of 22
+newdata <- data.frame(lstat = c(3, 10), rm = c(6, 9), ptratio = c(16, 22))
+
+# Use the predict() function to make predictions for newdata. Include the confidence interval for the prediction
+# Since we log-transformed the data, we need to exponentiate the predictions to get the original scale
+# note: we are ignoring the small bias term here introduced by the exponentiation (Jensen's inequality)
+exp(predict(lm_model_log, newdata, interval = "confidence"))
+
+```
+
+There are many factors that go into the price of a home, and this model is a simplification and based on data that we noted is likely biased. However, it is a good example of how to use linear regression models to make predictions on new data. The model predicts that Property 1 is worth about \$31K and Property 2 is worth about \$26K. The original simple linear regression that would have predicted Property 1 to be closer to \$32K and Property 2 to be worth \$25K with a much narrower confidence band. Comparing model outputs and the property pricing, Property 2 is a better value. The confidence intervals for the predictions indicate the range of values within which the true value of the prediction is likely to fall. If a model's confidence interval indicates a wide range compared to the predicted value, what does this say about the model? 
+
+Which property do you think is a better value based on the provided information? If you were using the model to guide a single purchasing decision, what else would influence your decision and what parameters would you discount or weight in your own model? What if the second property was on the Charles River? What if the distance of the first property was an additional 10 miles from your work?
+
+
+## Conclusion
+
+In these worksheet exercises, you explored the Boston Suburbs Housing dataset and generated multiple linear regression models. You used the `lm()` function to fit the models and the `summary()` function to view the summary of the models. Finally, you used the `predict()` function to make predictions for new data, You analyzed the model residuals to determine if model assumptions were met and assesed the distribution and whther the model broke any assumptions within a linear model. Next, you added two more highly correlated predictors to a multiple regression model and applied a log transformation to the dependent variable to account for observed non-linearity. Finally, you used the model to predict the houseing values on new data.
+
+In the appendix, we will explore model comparison and applying complex non-linearities within a linear regression model. We will compare the models using a variety of parameters and explore the adjusted R² values from the model summary tables. We will also confirm which model is the best fit by plotting the residuals and confirming that the residuals are normally distributed and there is less evidence of heteroscedasticity or non-linearity in those residuals compared to the simple linear model we started with.
+
+
+## Appendix: Model Comparison and Applying Complex Non-Linearities within a Linear Regression Model
+
+We lightly touched on how the `lm()` function can model simple single parameter linear models and how it can also accommodate non-linear transformations of the predictors. For fun, let's create some more complex models that perform a regression of `medv` onto lstat squared, a 5th order polynomial on `lstat`, and a complex model with log transformations of the predictor variables and interactions terms between predictor variables. You can quickly generate your own models by using the `update()` function as shown and adding or subtracting parameters, including non-linearities or indicating noted parameter interactions. For example, the syntax `lstat:black` tells R to include an interaction term between `lstat` and `black.` The syntax `lstat * age` simultaneously includes `lstat`, `age`, and the interaction term `lstat` x `age` as predictors; it is a short-hand for `lstat + age + lstat:age`. We can use `update()` to quickly generate a variety of new models and then use `anova()` to compare them. Note that if you use a log-transformation on the dependent variable, `anova()` can not be used to compare models. Instead, you can use adjusted R² values and the AIC and BIC values.
+
+We can compare the models using a variety of parameters. An `anova() `comparison allow you to look at F-values and p-values. You want to select the models with a higher F-value and near-zero p-value. The near-zero p-value associated with the complex non-linear model suggests that it leads to an improved model. You can also compare the adjusted R² values from the model `summary()` tables. The adjusted R² value adjusts the R² value for the number of predictors in the model and will always be less than or equal to the R² value. It will be higher when the model has more predictors and if those predictors are significant. It will be lower when the model has fewer predictors or if the chosen predictors are not significant.  You can confirm which model is the best fit by plotting the residuals and confirming that the residuals are normally distributed and there is less evidence of heteroscedasticity or non-linearity in those residuals compared to the simple linear model we started with.
+
+AIC and BIC numbers reflect the trade-off between model complexity and model performance. Lower AIC and BIC values indicate a better model fit. The AIC and BIC values are calculated based on the log-likelihood of the model and the number of parameters in the model. The AIC and BIC values can be used to compare models and select the best model incorporating the trade-off between model complexity and model performance.
+
+```{r, echo = TRUE}
+
+
+lm_model <- lm(medv ~ lstat, data = boston) #simple linear model
+lm_model_multiple <- lm(medv ~ lstat + rm + ptratio, data = boston)
+lm_model_sqlstat <- update(lm_model, . ~ . + I(lstat^2)) # square of lstat, `^` is a special character in R, so we use I() to indicate that we want to use it as a variable
+lm_model_poly <- update(lm_model, . ~ . + poly(lstat, 5)) # 5th order polynomial on lstat
+lm_complex <- update(lm_model, . ~ . + log(lstat) + lstat * black + poly(rm, 2)) # Combination of multiple interactions and non linear transformations
+lm_mod_logmedv <- update(lm_model_multiple, log(medv) ~ .) # log transformation of the dependent variable
+
+anova_results <- anova(lm_model, lm_model_multiple, lm_model_sqlstat, lm_model_poly, lm_complex)
+
+
+```
+
+```{r, model-comparison-results, echo = FALSE}
+
+tibble(
+  "Model" = c(
+    "lm_model",
+    "lm_model_multiple",
+    "lm_model_sqlstat",
+    "lm_model_poly",
+    "lm_complex",
+    "lm_mod_logmedv"
+  ),
+  "AIC" = c(
+    AIC(lm_model),
+    AIC(lm_model_multiple),
+    AIC(lm_model_sqlstat),
+    AIC(lm_model_poly),
+    AIC(lm_complex),
+    AIC(lm_mod_logmedv)
+  ),
+  "BIC" = c(
+    BIC(lm_model),
+    BIC(lm_model_multiple),
+    BIC(lm_model_sqlstat),
+    BIC(lm_model_poly),
+    BIC(lm_complex),
+    BIC(lm_mod_logmedv)
+  ),
+  "Adj R^2 Values" = c(
+    summary(lm_model)$adj.r.squared,
+    summary(lm_model_multiple)$adj.r.squared,
+    summary(lm_model_sqlstat)$adj.r.squared,
+    summary(lm_model_poly)$adj.r.squared,
+    summary(lm_complex)$adj.r.squared,
+    summary(lm_mod_logmedv)$adj.r.squared
+  ),
+  "A-Nova p-values" = c(
+    anova_results$`Pr(>F)`[1],
+    anova_results$`Pr(>F)`[2],
+    anova_results$`Pr(>F)`[3],
+    anova_results$`Pr(>F)`[4],
+    anova_results$`Pr(>F)`[5],
+    anova_results$`Pr(>F)`[6]
+  )
+)
+
+```
+
+It appears from the data above that `lm_complex` may be an even better fit than our log-transformed dependent variable with `lstat`, `pratio` and `rm.` The AIC and BIC values are lower (closer to 0) and the adjusted R² value is highest The anova p-value is near zero, indicating that the complex model leads to an improved model. The complex model includes log transformations of the predictor variables and interaction terms between predictor variables. The complex model may be a better fit for the data, but it is important to assess the residuals to ensure that the model assumptions are met. 
+
+```{r, echo = FALSE}
+```{r visualizing-residuals-multiple, echo = FALSE}
+# Augment the original dataset with the residuals and fitted values from the
+# multiple regression model to make it easier to visualize the residuals
+lm_complex.fit <- lm_complex |> augment(boston)
+
+
+# Residual vs. Fitted plot
+ggplot(lm_complex.fit, aes(.fitted, .resid)) +
+  geom_point(alpha = 0.5) +
+  geom_hline(yintercept = 0,
+             linetype = "dashed",
+             color = "red") +
+  labs(title = "Residual vs Fitted Plot", x = "Fitted Values", y = "Residuals") +
+  theme_minimal()
+
+#qq-plot
+ggplot(lm_complex.fit) +
+  geom_qq(aes(sample = .resid), size = 4, alpha = 0.5) +
+  geom_qq_line(aes(sample = .resid), linewidth = 1) +
+  labs(title = "QQ Plot: Theoretical vs Sample Quantiles", x = "Theoretical Quantiles", y = "Sample Quantiles") +
+  theme_minimal()
+
+# histogram of residuals
+ggplot(lm_complex.fit, aes(x = .resid)) +
+  geom_histogram(
+    bins = 30,
+    fill = "blue",
+    color = "black",
+    alpha = 0.7
+  ) +
+  geom_rug(sides = "b", color = "red") + # a rug plot shows the density/distribution of the residuals
+  labs(title = "Histogram of Residuals", x = "Residuals", y = "Frequency") +
+  theme_minimal()
+```
+
+The resulting residuals visualizations show a more normally distributed residuals and less evidence of heteroscedasticity or non-linearity in the residuals compared to the simple linear model we started with and compared to the multiple regression model. This model should provide better prediction values within the range of the given dataset. It is important to note that the complex model may be overfitting the data and may not generalize well to new data.
+
+Note that even with added complexity, the model is still only based on a limited number of 506 data points and additional complexity does not necessarily make for a better or more resilient model when incorporating new data. It is important to consider the trade-offs between model complexity and interpretability. The more complex the model, the more difficult it may be to interpret and the more likely it is to overfit the data. It is important to balance model complexity with model performance and interpretability and to keep in mind how the model will be used in addition to quantitative measures to inform you on the best model to use. When comparing various models, you can also explore other model comparison metrics such as AIC and BIC values to determine the best model fit.
